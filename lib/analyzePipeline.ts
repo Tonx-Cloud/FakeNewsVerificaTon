@@ -7,7 +7,20 @@ export async function analyzePipeline(inputType: string, content: string) {
   const fingerprint = crypto.createHash('sha256').update(normalized).digest('hex')
 
   // Build a prompt to ask OpenAI to return structured JSON matching the required schema
-  const prompt = `You are an assistant that analyzes content for disinformation. Return only JSON with fields: meta, scores, summary, claims, similar, reportMarkdown. Content: ${normalized}`
+  const prompt = `You are a neutral content analyst. Analyze the following content for signs of disinformation, bias, and manipulation.
+
+RULES:
+- NEVER support candidates, parties, or ideologies
+- ONLY evaluate explicit claims, not opinions or rhetoric
+- Separate facts from opinions and lack of evidence
+- In political contexts, evaluate claims only, never judge people or groups
+- Prefer "Inconclusivo" when there is insufficient basis to conclude
+- Use neutral language, no partisan rhetoric
+
+Return ONLY JSON with fields: meta, scores, summary, claims, similar, reportMarkdown.
+
+Content to analyze:
+${normalized}`
 
   const resp = await openai.responses.create({
     model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
@@ -21,12 +34,12 @@ export async function analyzePipeline(inputType: string, content: string) {
   try { parsed = JSON.parse(txt) } catch (e) {
     // fallback: build a minimal response
     parsed = {
-      meta: { id: crypto.randomUUID(), createdAt: new Date().toISOString(), inputType, language: 'pt-BR', mode: 'mvp_no_external_sources', warnings: [] },
+      meta: { id: crypto.randomUUID(), createdAt: new Date().toISOString(), inputType, language: 'pt-BR', mode: 'mvp_no_external_sources', warnings: ['Análise baseada apenas no conteúdo fornecido. Não substitui verificação profissional.'] },
       scores: { fakeProbability: 50, verifiableTruth: 20, biasFraming: 40, manipulationRisk: 30 },
-      summary: { headline: 'Resumo (MVP)', oneParagraph: normalized.slice(0, 300), verdict: 'Inconclusivo' },
+      summary: { headline: 'Resultado Inconclusivo', oneParagraph: 'Não há base suficiente para uma conclusão definitiva. Recomendamos verificar em fontes confiáveis.', verdict: 'Inconclusivo' },
       claims: [],
       similar: { searchQueries: [], externalChecks: [] },
-      reportMarkdown: `# Relatório\n\n${normalized}`
+      reportMarkdown: `# Relatório de Análise\n\n${normalized}\n\n---\n\n**Nota:** Este é um resultado inicial. Para conclusões definitivas, consulte agências de checagem profissionais.`
     }
   }
 
