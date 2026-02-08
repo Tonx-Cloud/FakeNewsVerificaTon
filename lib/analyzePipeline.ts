@@ -21,7 +21,7 @@ Content to analyze:
 ${normalized}`
 
   const resp = await openaiClient.responses.create({
-    model: process.env.OPENAI_MODEL || 'gpt-5',
+    model: process.env.OPENAI_MODEL || 'gpt-4o',
     input: prompt,
     max_output_tokens: 800
   })
