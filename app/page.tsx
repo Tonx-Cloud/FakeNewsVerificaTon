@@ -209,11 +209,18 @@ export default function Home() {
                       Configuracao incompleta: a chave da OpenAI nao esta definida no servidor (Vercel).
                     </p>
                     <p className="text-xs text-amber-600 mt-1">
-                      Para resolver, adicione a variavel <code>OPENAI_API_KEY</code> nas configuracoes de ambiente do seu projeto na Vercel.
+                      Se voce e o dono do site, verifique os logs da Vercel e adicione a variavel <code>OPENAI_API_KEY</code> nas configuracoes de ambiente.
                     </p>
                   </div>
                 ) : (
-                  <p className="text-xs text-amber-700 mt-1">{apiError.message}</p>
+                  <div className="mt-2">
+                    <p className="text-xs text-amber-700">
+                      Servidor nao conseguiu analisar agora.
+                    </p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      Se voce e o dono do site, verifique os logs da Vercel Functions.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>
