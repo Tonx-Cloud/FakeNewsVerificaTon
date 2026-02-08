@@ -74,4 +74,20 @@ create policy "Anyone can read trending items"
 create policy "Service role can manage trending items"
   on trending_items for all using (auth.role() = 'service_role');
 
+-- SUBSCRIBERS (newsletter / alerts)
+create table subscribers (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  email text,
+  whatsapp text,
+  created_at timestamptz default now(),
+  last_active timestamptz
+);
+
+alter table subscribers enable row level security;
+
+-- Only service role manages subscribers
+create policy "Service role can manage all subscribers"
+  on subscribers for all using (auth.role() = 'service_role');
+
 -- Note: You need to run recommended Supabase auth setup and link profile IDs with auth.users.id

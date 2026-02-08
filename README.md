@@ -1,151 +1,103 @@
 # FakeNewsZeiTon
 
-Minimal MVP to analyze possible fake news using OpenAI, Supabase and Resend.
+Ferramenta de analise de desinformacao assistida por IA. Recebe conteudo (texto, link, imagem ou audio) e gera um relatorio estruturado com scores, veredito, avaliacao de afirmacoes, fontes de checagem e recomendacoes.
 
-Overview
+**Live:** https://fake-newszei-ton-narb.vercel.app  
+**Repo:** https://github.com/Tonx-Cloud/FakeNewszeiTon.git
 
-- FakeNewsZeiTon recebe conteúdo (texto, link, imagem, áudio) e gera um relatório assistido por IA que estima risco de desinformação, viés e sinais de golpe.
-- Público-alvo: jornalistas, verificadores, usuários que recebem conteúdo via WhatsApp e querem um relatório rápido.
-- Limitações: Análise assistida por IA (OpenAI). Não substitui agências de fact-checking. No modo MVP, fontes externas NÃO são consultadas automaticamente.
+## Stack
 
-Stack
+- **Next.js 14** (App Router, TypeScript)
+- **Tailwind CSS 3** (dark mode, glassmorphism, animations)
+- **Gemini 2.0 Flash** (`@google/generative-ai`) — analise multimodal (texto, imagem, audio)
+- **Supabase** — Auth (magic link), PostgreSQL (profiles, analyses, trending_items, subscribers)
+- **Resend** — email digests
+- **react-markdown** + remark-gfm + rehype-raw — renderizacao de relatorios em Markdown
+- **Vercel** — deploy automatico + cron
 
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS
-- OpenAI (Responses API)
-- Resend (envio de digest por e-mail)
-- Supabase (esquema SQL fornecido para migrations)
-
-Run locally
-
-1. Install dependencies
+## Setup local
 
 ```bash
+# 1. Instalar dependencias
 npm install
-```
 
-2. Create a Supabase project and run the SQL migration: [supabase/sql/001_init.sql](supabase/sql/001_init.sql)
+# 2. Criar projeto Supabase e rodar migration
+# Execute o conteudo de supabase/sql/001_init.sql no SQL Editor do Supabase
 
-3. Copy `.env.example` to `.env.local` and fill required vars (see Environment Variables section)
+# 3. Copiar .env.example para .env.local e preencher as variaveis
 
-4. Run the app in development
-
-```bash
+# 4. Rodar em dev
 npm run dev
 ```
 
-Git / GitHub (local steps already executed)
+## Variaveis de ambiente
 
-The following commands were executed locally in this workspace:
+| Variavel | Descricao |
+|----------|-----------|
+| `GEMINI_API_KEY` | Chave da API Google Gemini |
+| `GEMINI_MODEL` | Modelo (default: `gemini-2.0-flash`) |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL do projeto Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave publica (anon) do Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Chave service_role (server-side) |
+| `RESEND_API_KEY` | Chave da API Resend |
+| `FROM_EMAIL` | Email remetente dos digests |
+| `PUBLIC_APP_URL` | URL publica do app |
+| `CRON_SECRET` | Segredo para proteger endpoint de cron |
+| `UNSUB_SECRET` | Segredo para tokens de unsubscribe |
 
-```bash
-git init
-git checkout -b main
-git add .
-git commit -m "Initial: FakeNewsZeiTon MVP (Next.js + OpenAI + Resend)"
+## Banco de dados (Supabase)
+
+Tabelas em `supabase/sql/001_init.sql`:
+
+- **profiles** — perfil de usuario (vinculado a auth.users)
+- **analyses** — analises salvas com scores, veredito, markdown
+- **trending_items** — agregacao de fakes em alta (cron)
+- **subscribers** — inscricoes para alertas (nome, email, whatsapp, opcionais)
+
+Todas com RLS ativado. Service role gerencia via API routes.
+
+## Paginas
+
+| Rota | Descricao |
+|------|-----------|
+| `/` | Pagina principal — hero, analise, resultado com Markdown, fontes, WhatsApp, PIX |
+| `/auth` | Login via magic link (Supabase Auth) |
+| `/auth/callback` | Callback — route.ts troca code por sessao, page.tsx confirma e redireciona |
+| `/subscribe` | Inscricao para alertas (nome, email, WhatsApp — campos opcionais) |
+| `/alerts` | Pagina de trending fakes (SSR, force-dynamic) |
+
+## API Routes
+
+| Endpoint | Metodo | Descricao |
+|----------|--------|-----------|
+| `/api/analyze` | POST | Analise de conteudo (rate limit 10/min/IP, max 4.5 MB) |
+| `/api/subscribe` | POST | Cadastro de subscriber (upsert por email/whatsapp) |
+| `/api/cron/digest` | GET | Envia digest por email (protegido por CRON_SECRET) |
+
+## Relatorio Markdown
+
+O pipeline de analise (`lib/analyzePipeline.ts`) gera um relatorio Markdown estruturado server-side com:
+
+1. **Resultado** — veredito com emoji (❌/✅/⚠️) + resumo
+2. **Scores** — tabela markdown com metricas e indicadores visuais
+3. **Avaliacao das afirmacoes** — cada claim com assessment e confianca
+4. **Fontes externas** — links para agencias de checagem relevantes
+5. **Recomendacoes** — passos para o usuario verificar por conta propria
+6. **Pesquise voce mesmo** — queries sugeridas
+
+O Markdown e renderizado no frontend com `react-markdown` + `remark-gfm` + `rehype-raw` com classes `prose` do Tailwind.
+
+## Cron
+
+Configurado em `vercel.json` — executa diariamente as 09:00 UTC:
+
+```json
+{ "crons": [{ "path": "/api/cron/digest?key=CRON_SECRET", "schedule": "0 9 * * *" }] }
 ```
 
-Note: The GitHub CLI (`gh`) was not available in this environment, so I could not create the remote repository automatically. To create the GitHub repository and push the `main` branch, run the following locally (requires `gh` authenticated):
+## Neutralidade
 
-```bash
-gh repo create FakeNewsZeiTon --public --source=. --remote=origin --push
-```
+O FakeNewsZeiTon nao apoia candidatos, partidos ou ideologias. A analise avalia afirmacoes explicitas, nunca pessoas ou grupos. Quando nao ha base para conclusao, o resultado e "Inconclusivo".
 
-After running the above, confirm the repository URL and update this README.
-
-Vercel (deploy)
-
-- Link the project to Vercel (interactive):
-
-```bash
-vercel link
-```
-
-- Or create and deploy in one step (may prompt for scope/project):
-
-```bash
-vercel --prod
-```
-
-If you prefer a non-interactive flow, use the Vercel dashboard to create a new project named `FakeNewsZeiTon` and connect the GitHub repository.
-
-Environment variables for Production (Vercel)
-
-Set these in the Vercel Project settings (Environment Variables) before deployment:
-
-- `OPENAI_API_KEY` — API key for OpenAI (server-side only)
-- `OPENAI_MODEL` — default `gpt-4o-mini`
-- `RESEND_API_KEY` — API key for Resend (used to send digest emails)
-- `FROM_EMAIL` — From address for emails (e.g. "FakeNewsZeiTon <onboarding@resend.dev>")
-- `PUBLIC_APP_URL` — e.g. `https://your-app.vercel.app`
-- `CRON_SECRET` — secret used to protect the digest endpoint
-- `UNSUB_SECRET` — secret used to sign unsubscribe tokens
-
-Notes:
-
-- `FROM_EMAIL` can use `onboarding@resend.dev` for testing with Resend. If you use a custom domain, verify it in Resend first.
-
-Cron (digest of trending fakes)
-
-- Endpoint (exists in the app): `/api/cron/digest?key=CRON_SECRET`
-- Configure a Vercel cron job (or external scheduler) to call:
-
-```
-https://YOUR_VERCEL_DOMAIN.vercel.app/api/cron/digest?key=CRON_SECRET
-```
-
-- Frequency: daily (for `daily` users) — document or schedule as needed in Vercel Cron.
-
-Compliance / Transparency
-
-- Always show this text prominently in product UI and emails: "Análise assistida por IA (OpenAI) para estimar risco de desinformação, viés e sinais de golpe. Não substitui agências de fact-checking."
-- In the app footer: "Modo: MVP — fontes externas não consultadas por padrão."
-
-Roadmap (short)
-
-- Autenticação Supabase (magic link)
-- Persistência de análises (salvar histórico por usuário)
-- Trending aggregation avançada e deduplicação de claims
-- Integração com provedores externos de fact-checking
-
-Commands executed in this session
-
-```bash
-npm install
-npm run build
-git init
-git checkout -b main
-git add .
-git commit -m "Initial: FakeNewsZeiTon MVP (Next.js + OpenAI + Resend)"
-```
-
-To finish (manual steps required locally)
-
-1. Create GitHub repo and push (requires `gh`):
-
-```bash
-gh repo create FakeNewsZeiTon --public --source=. --remote=origin --push
-```
-
-2. Create a Vercel project (via dashboard or `vercel link`) and set production environment variables listed above.
-
-3. Deploy production:
-
-```bash
-vercel --prod
-```
-
-After creating the GitHub repo and deploying, update this README with the repository URL and the public app URL.
-
-—
-PASSO C status checklist
-
-- [x] Git initialized and initial commit created
-- [ ] GitHub repo created (run `gh repo create ...` locally)
-- [ ] Push to GitHub (run locally after `gh repo create` completes)
-- [ ] Vercel project linked and deployed (run locally or via dashboard)
-- [ ] README updated with final URLs (update after steps above)
-
-Next recommended: PASSO B (Auth Supabase)
+*Analise assistida por IA (Gemini). Nao substitui checagem profissional.*
 

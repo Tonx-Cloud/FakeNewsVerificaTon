@@ -38,7 +38,7 @@ export async function GET(request: Request) {
           email: user.email,
         }, { onConflict: 'id' })
       }
-      return NextResponse.redirect(new URL(next, request.url))
+      return NextResponse.redirect(new URL('/auth/confirm', request.url))
     }
   }
 

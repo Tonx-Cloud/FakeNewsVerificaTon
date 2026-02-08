@@ -1,5 +1,8 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 
 type TabType = 'text' | 'link' | 'image' | 'audio'
 type LoadingState = 'idle' | 'loading' | 'error' | 'success'
@@ -129,6 +132,7 @@ export default function Home() {
           <span className="text-white/90 text-sm font-medium tracking-wide">FakeNewsZeiTon</span>
           <div className="flex items-center gap-4">
             <a href="/alerts" className="text-white/70 text-xs hover:text-white transition">Alertas</a>
+            <a href="/subscribe" className="text-white/70 text-xs hover:text-white transition">Inscrever-se</a>
             <a href="/auth" className="text-white/70 text-xs hover:text-white transition">Entrar</a>
             <button onClick={toggle} className="text-white/60 hover:text-white transition text-lg" title="Alternar tema">
               {dark ? '☀️' : '🌙'}
@@ -317,10 +321,21 @@ export default function Home() {
               {report.summary?.oneParagraph || report.summary?.headline}
             </p>
 
+            {/* Full Markdown Report */}
+            {report.reportMarkdown && (
+              <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:text-slate-800 dark:prose-headings:text-white prose-a:text-brand-600 dark:prose-a:text-brand-400 prose-table:text-sm prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:px-3 prose-th:py-1.5 prose-td:px-3 prose-td:py-1.5">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                    {report.reportMarkdown}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 mt-6">
               <button onClick={copyReport} className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-750 transition">
-                📋 Copiar resumo
+                📋 Copiar relatorio
               </button>
               <button onClick={downloadReport} className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-750 transition">
                 ⬇️ Baixar .md
