@@ -10,15 +10,20 @@ interface ReportResult { ok: true; meta: any; scores: any; summary: any; claims:
 /* ─── Intersection Observer hook for scroll animations ─── */
 function useScrollReveal() {
   const ref = useRef<HTMLDivElement>(null)
+  const observed = useRef(false)
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el || observed.current) return
     const obs = new IntersectionObserver(([e]) => {
-      if (e.isIntersecting) { e.target.classList.add('is-visible'); obs.unobserve(e.target) }
-    }, { threshold: 0.15 })
+      if (e.isIntersecting) {
+        e.target.classList.add('is-visible')
+        observed.current = true
+        obs.unobserve(e.target)
+      }
+    }, { threshold: 0.1 })
     obs.observe(el)
     return () => obs.disconnect()
-  }, [])
+  })
   return ref
 }
 
@@ -80,7 +85,6 @@ export default function Home() {
   const heroRef = useScrollReveal()
   const stepsRef = useScrollReveal()
   const inputRef = useScrollReveal()
-  const resultRef = useScrollReveal()
   const sourcesRef = useScrollReveal()
   const whatsRef = useScrollReveal()
   const pixRef = useScrollReveal()
@@ -272,8 +276,8 @@ export default function Home() {
 
       {/* ═══════ RESULTADO ═══════ */}
       {loading === 'success' && report && (
-        <section ref={resultRef} className="animate-on-scroll px-6 pb-10 max-w-2xl mx-auto">
-          <div className="glass rounded-2xl shadow-lg border border-slate-200/60 dark:border-slate-700/60 p-6 animate-fade-in-up">
+        <section className="px-6 pb-10 max-w-2xl mx-auto animate-fade-in-up">
+          <div className="glass rounded-2xl shadow-lg border border-slate-200/60 dark:border-slate-700/60 p-6">
             {/* Headline */}
             <div className="text-center mb-6">
               <h3 className="text-xl font-bold dark:text-white">{report.summary?.headline || 'Resultado'}</h3>
