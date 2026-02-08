@@ -1,4 +1,8 @@
-export async function understandImage(_input:string){
-  // MVP stub: return a short caption if possible
-  return 'Descrição de imagem não disponível no modo MVP.'
+/**
+ * Image understanding is now handled directly by Gemini multimodal
+ * in analyzePipeline.ts via inlineData. This module is kept for
+ * potential future use with dedicated vision models.
+ */
+export async function understandImage(_input: string) {
+  return 'Imagem processada via Gemini multimodal.'
 }
