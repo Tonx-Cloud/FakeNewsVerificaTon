@@ -380,6 +380,9 @@ export default function Home() {
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-5">
             Compartilhe o resultado com quem te enviou a mensagem. Desinformação afeta pessoas reais.
           </p>
+          <div className="text-center font-extrabold text-2xl md:text-4xl text-red-600 mb-6">
+            TODOS CONTRA AS FAKES NEWS!
+          </div>
           <button
             onClick={copyWhatsApp}
             className="inline-flex items-center gap-2 px-8 py-3 rounded-2xl font-semibold text-white text-sm shadow-lg transition-all duration-200"
