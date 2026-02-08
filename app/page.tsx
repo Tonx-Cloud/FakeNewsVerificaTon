@@ -89,6 +89,10 @@ export default function Home() {
       <header className="py-4 px-6 border-b">
         <div className="max-w-lg mx-auto flex justify-between items-center">
           <h1 className="text-lg font-semibold">FakeNewsZeiTon</h1>
+          <div className="flex gap-3">
+            <a href="/alerts" className="text-xs text-slate-500 hover:underline">Alertas</a>
+            <a href="/auth" className="text-xs text-slate-500 hover:underline">Entrar</a>
+          </div>
         </div>
       </header>
 
@@ -299,7 +303,7 @@ export default function Home() {
           Use tambem fontes independentes e reconhecidas para confirmar informacoes.
         </p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-          <a href="https://lupa.africanfo.com.br" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:underline">Agencia Lupa</a>
+          <a href="https://lupa.uol.com.br" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:underline">Agencia Lupa</a>
           <a href="https://aosfatos.org" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:underline">Aos Fatos</a>
           <a href="https://g1.globo.com/fato-ou-fake" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:underline">Fato ou Fake (g1)</a>
           <a href="https://politica.estadao.com.br/verificacao" target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:underline">Estadao Verifica</a>
@@ -345,7 +349,7 @@ export default function Home() {
               Quando nao ha base suficiente para concluir, o resultado e indicado como "Inconclusivo".
             </p>
             <p>
-              Analise assistida por IA (OpenAI). Nao substitui agencias profissionais de checagem.
+              Analise assistida por IA (Gemini). Nao substitui agencias profissionais de checagem.
             </p>
           </div>
         )}
@@ -358,25 +362,17 @@ export default function Home() {
           <p className="text-xs text-slate-500 mb-3">
             Este projeto e independente e mantido de forma voluntaria. Se ele te ajudou, considere apoiar.
           </p>
-          <div className="flex items-center gap-4 p-4 bg-slate-50 rounded">
-            <div className="w-24 h-24 bg-white border flex items-center justify-center">
-              <svg width="80" height="80" viewBox="0 0 100 100" className="text-slate-800">
-                <rect width="100" height="100" fill="white"/>
-                <path d="M10 10h20v20h-20z M40 10h10v10h-10z M70 10h20v20h-20z M10 40h20v10h-20z M40 40h10v10h-10z M60 40h10v10h-10z M80 40h10v10h-10z M10 60h10v20h-10z M30 60h10v10h-10z M50 60h20v20h-20z M80 60h10v20h-10z M10 80h20v10h-20z M40 80h10v10h-10z M70 80h20v10h-20z" fill="currentColor"/>
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-xs text-slate-400 mb-1">Chave PIX (copiavel)</p>
-              <button
-                onClick={copyPixKey}
-                className="text-xs bg-slate-100 px-2 py-1 rounded border hover:bg-slate-200"
-              >
-                6deb665d-6e79-4959-839e-6831db7307fb
-              </button>
-              <p className="text-xs text-slate-300 mt-2">
-                A doacao e opcional e nao influencia analises ou resultados.
-              </p>
-            </div>
+          <div className="p-4 bg-slate-50 rounded">
+            <p className="text-xs text-slate-400 mb-2">Chave PIX (clique para copiar)</p>
+            <button
+              onClick={copyPixKey}
+              className="w-full text-left text-sm bg-white px-4 py-3 rounded border hover:bg-slate-100 font-mono break-all"
+            >
+              6deb665d-6e79-4959-839e-6831db7307fb
+            </button>
+            <p className="text-xs text-slate-300 mt-2">
+              A doacao e opcional e nao influencia analises ou resultados.
+            </p>
           </div>
         </div>
       </section>
