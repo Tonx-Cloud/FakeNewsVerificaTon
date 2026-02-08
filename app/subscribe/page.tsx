@@ -66,7 +66,7 @@ export default function SubscribePage() {
       {/* Nav */}
       <nav className="flex items-center justify-between px-6 py-4 max-w-4xl mx-auto">
         <a href="/" className="text-slate-700 dark:text-slate-200 text-sm font-medium tracking-wide hover:text-brand-600 transition">
-          ← FakeNewsZeiTon
+          ← Fake News Verificaton
         </a>
         <button onClick={toggle} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition text-lg" title="Alternar tema">
           {dark ? '☀️' : '🌙'}

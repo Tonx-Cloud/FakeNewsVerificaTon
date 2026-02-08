@@ -1,8 +1,8 @@
-# FakeNewsZeiTon
+# Fake News Verificaton
 
 Ferramenta de analise de desinformacao assistida por IA. Recebe conteudo (texto, link, imagem ou audio) e gera um relatorio estruturado com scores, veredito, avaliacao de afirmacoes, fontes de checagem e recomendacoes.
 
-**Live:** https://fake-newszei-ton-narb.vercel.app  
+**Live:** https://fakenewsverificaton.com.br  
 **Repo:** https://github.com/Tonx-Cloud/FakeNewszeiTon.git
 
 ## Stack
@@ -41,7 +41,7 @@ npm run dev
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave service_role (server-side) |
 | `RESEND_API_KEY` | Chave da API Resend |
 | `FROM_EMAIL` | Email remetente dos digests |
-| `PUBLIC_APP_URL` | URL publica do app |
+| `PUBLIC_APP_URL` | URL publica do app (`https://fakenewsverificaton.com.br`) |
 | `CRON_SECRET` | Segredo para proteger endpoint de cron |
 | `UNSUB_SECRET` | Segredo para tokens de unsubscribe |
 
@@ -62,7 +62,7 @@ Todas com RLS ativado. Service role gerencia via API routes.
 |------|-----------|
 | `/` | Pagina principal — hero, analise, resultado com Markdown, fontes, WhatsApp, PIX |
 | `/auth` | Login via magic link (Supabase Auth) |
-| `/auth/callback` | Callback — route.ts troca code por sessao, page.tsx confirma e redireciona |
+| `/auth/callback` | Callback — route.ts troca code por sessao e redireciona para HOME (/) |
 | `/subscribe` | Inscricao para alertas (nome, email, WhatsApp — campos opcionais) |
 | `/alerts` | Pagina de trending fakes (SSR, force-dynamic) |
 
@@ -97,7 +97,7 @@ Configurado em `vercel.json` — executa diariamente as 09:00 UTC:
 
 ## Neutralidade
 
-O FakeNewsZeiTon nao apoia candidatos, partidos ou ideologias. A analise avalia afirmacoes explicitas, nunca pessoas ou grupos. Quando nao ha base para conclusao, o resultado e "Inconclusivo".
+O Fake News Verificaton nao apoia candidatos, partidos ou ideologias. A analise avalia afirmacoes explicitas, nunca pessoas ou grupos. Quando nao ha base para conclusao, o resultado e "Inconclusivo".
 
 *Analise assistida por IA (Gemini). Nao substitui checagem profissional.*
 

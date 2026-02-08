@@ -109,13 +109,13 @@ export default function Home() {
   }
 
   const copyWhatsApp = () => {
-    const txt = `Oi! Recebi aquela mensagem e resolvi analisar com o FakeNewsZeiTon.\nResultado: ${report?.summary?.verdict || 'Inconclusivo'} (risco de fake: ${report?.scores?.fakeProbability || 0}%).\nConfirme em fontes confiaveis antes de compartilhar!`
+    const txt = `Oi! Recebi aquela mensagem e resolvi analisar com o Fake News Verificaton.\nResultado: ${report?.summary?.verdict || 'Inconclusivo'} (risco de fake: ${report?.scores?.fakeProbability || 0}%).\nConfira em: fakenewsverificaton.com.br`
     navigator.clipboard.writeText(txt); setWhatsCopied(true); setTimeout(() => setWhatsCopied(false), 2000)
   }
   const copyReport = () => { navigator.clipboard.writeText(report?.reportMarkdown || ''); alert('Relatorio copiado!') }
   const downloadReport = () => {
     const b = new Blob([report?.reportMarkdown || ''], { type: 'text/markdown' })
-    const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'relatorio-fakenewszeiton.md'; a.click(); URL.revokeObjectURL(u)
+    const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'relatorio-fakenewsverificaton.md'; a.click(); URL.revokeObjectURL(u)
   }
   const copyPixKey = () => {
     navigator.clipboard.writeText('6deb665d-6e79-4959-839e-6831db7307fb')
@@ -130,7 +130,7 @@ export default function Home() {
         {/* Nav */}
         <nav className="relative z-10 flex items-center justify-between px-6 py-4 max-w-4xl mx-auto">
           <a href="/" className="text-white/90 text-sm font-medium tracking-wide">
-            Fake<span className="text-[#1d9bf0]">News</span>ZeiTon
+            Fake <span className="text-[#1d9bf0]">News</span> Verificaton
           </a>
           <div className="flex items-center gap-4">
             <a href="/alerts" className="text-white/50 text-xs hover:text-white transition">Alertas</a>
@@ -144,7 +144,7 @@ export default function Home() {
 
         <div ref={heroRef} className="animate-on-scroll relative z-10 text-center px-6 pt-16 pb-20 max-w-2xl mx-auto">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white/95 leading-tight mb-5 tracking-tight">
-            Fake<span className="text-[#1d9bf0]">News</span>ZeiTon
+            Fake <span className="text-[#1d9bf0]">News</span> Verificaton
           </h1>
           <p className="text-white/50 text-sm sm:text-base leading-relaxed mb-3 max-w-md mx-auto">
             Verifique as informacoes antes de compartilhar.
@@ -392,7 +392,7 @@ export default function Home() {
         {showNeutrality && (
           <div className="mt-4 p-5 bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 animate-fade-in leading-relaxed">
             <h4 className="font-semibold mb-2 text-slate-800 dark:text-white">Neutralidade por metodo (nao por opiniao)</h4>
-            <p className="mb-2">O FakeNewsZeiTon nao apoia candidatos, partidos ou ideologias. A analise e guiada por metodo: extraimos as afirmacoes, avaliamos a evidencia disponivel, verificamos consistencia logica, apontamos possiveis tecnicas de manipulacao e sugerimos caminhos para verificacao em multiplas fontes confiaveis.</p>
+            <p className="mb-2">O Fake News Verificaton nao apoia candidatos, partidos ou ideologias. A analise e guiada por metodo: extraimos as afirmacoes, avaliamos a evidencia disponivel, verificamos consistencia logica, apontamos possiveis tecnicas de manipulacao e sugerimos caminhos para verificacao em multiplas fontes confiaveis.</p>
             <p className="mb-2">Quando nao ha base suficiente para concluir, o resultado e &quot;Inconclusivo&quot;.</p>
             <p>Analise assistida por IA (Gemini). Nao substitui agencias profissionais de checagem.</p>
           </div>
@@ -429,7 +429,7 @@ export default function Home() {
 
       {/* ═══════ FOOTER ═══════ */}
       <footer className="text-center text-xs text-slate-400 dark:text-slate-500 pb-8 pt-4">
-        FakeNewsZeiTon — Neutralidade por metodo
+        Fake News Verificaton — Neutralidade por metodo
       </footer>
     </main>
   )

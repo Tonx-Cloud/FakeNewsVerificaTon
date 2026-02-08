@@ -30,7 +30,7 @@ export default function AuthPage() {
     const { error: authError } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/auth/callback`,
       }
     })
 
@@ -70,7 +70,7 @@ export default function AuthPage() {
   return (
     <main className="min-h-screen bg-white p-6 text-slate-800">
       <div className="max-w-md mx-auto mt-20">
-        <h1 className="text-xl font-semibold mb-2">Entrar no FakeNewsZeiTon</h1>
+        <h1 className="text-xl font-semibold mb-2">Entrar no Fake News Verificaton</h1>
         <p className="text-sm text-slate-500 mb-6">
           Use seu email para receber um link magico de acesso. Sem senha necessaria.
         </p>

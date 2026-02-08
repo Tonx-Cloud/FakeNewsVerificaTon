@@ -132,12 +132,16 @@ export async function analyzePipeline(inputType: string, content: string) {
   if (inputType === 'link') {
     try {
       const urlObj = new URL(content.trim())
-      if (urlObj.hostname.includes('fakenewszeiton') || urlObj.hostname.includes('fake-newszei-ton')) {
+      if (
+        urlObj.hostname.includes('fakenewsverificaton') ||
+        urlObj.hostname.includes('fakenewszeiton') ||
+        urlObj.hostname.includes('fake-newszei-ton')
+      ) {
         const selfResult = {
           ok: true as const,
           meta: { id: crypto.randomUUID(), createdAt: new Date().toISOString(), inputType, language: 'pt-BR', mode: 'self_reference', warnings: [], fingerprint },
           scores: { fakeProbability: 0, verifiableTruth: 100, biasFraming: 0, manipulationRisk: 0 },
-          summary: { headline: 'Site oficial', oneParagraph: 'Este e o site oficial do FakeNewsZeiTon, nao sujeito a analise de fake news.', verdict: 'Provavel verdadeiro' as const },
+          summary: { headline: 'Site oficial do Fake News Verificaton', oneParagraph: 'Este e o site oficial do Fake News Verificaton. O sistema nao analisa o proprio dominio.', verdict: 'Provavel verdadeiro' as const },
           claims: [],
           similar: { searchQueries: [], externalChecks: [] },
           recommendations: [],
