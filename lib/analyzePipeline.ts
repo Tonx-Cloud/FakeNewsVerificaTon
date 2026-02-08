@@ -20,13 +20,13 @@ Return ONLY JSON with fields: meta, scores, summary, claims, similar, reportMark
 Content to analyze:
 ${normalized}`
 
-  const resp = await openaiClient.responses.create({
+  const resp = await openaiClient.chat.completions.create({
     model: process.env.OPENAI_MODEL || 'gpt-4o',
-    input: prompt,
-    max_output_tokens: 800
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: 800
   })
 
-  const txt = String((resp as any).output_text || JSON.stringify(resp))
+  const txt = String((resp as any).choices?.[0]?.message?.content || JSON.stringify(resp))
   let parsed: any = null
   try { parsed = JSON.parse(txt) } catch (e) {
     parsed = {
