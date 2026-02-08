@@ -9,6 +9,18 @@ import { extractFromUrl } from '@/lib/services/extractor'
 
 export const runtime = 'nodejs'
 
+/* Preflight CORS — evita 405 em requests cross-origin */
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  })
+}
+
 export async function POST(req: Request) {
   try {
     // ── 1. Rate limit by IP ──
