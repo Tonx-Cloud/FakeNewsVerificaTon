@@ -1,19 +1,31 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
+import CaptchaWrapper from '@/components/auth/captcha-wrapper'
 
 export default function SubscribePage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [captchaKey, setCaptchaKey] = useState(0)
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
 
+  const onCaptchaVerify = useCallback((token: string) => setTurnstileToken(token), [])
+  const onCaptchaExpire = useCallback(() => setTurnstileToken(''), [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email.trim() && !whatsapp.trim()) {
-      setErrorMsg('Informe pelo menos um email ou WhatsApp.')
+    if (!email.trim()) {
+      setErrorMsg('E-mail é obrigatório.')
+      setStatus('error')
+      return
+    }
+    if (!acceptedTerms) {
+      setErrorMsg('Você precisa aceitar os Termos e Política de Privacidade.')
       setStatus('error')
       return
     }
@@ -25,33 +37,38 @@ export default function SubscribePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim() || null,
-          email: email.trim() || null,
+          email: email.trim(),
           whatsapp: whatsapp.trim() || null,
+          acceptedTerms: true,
+          turnstileToken: turnstileToken || undefined,
         }),
       })
       const data = await res.json()
       if (!res.ok || !data.ok) {
         setErrorMsg(data.message || 'Erro ao cadastrar. Tente novamente.')
         setStatus('error')
+        setCaptchaKey(k => k + 1)
+        setTurnstileToken('')
       } else {
         setStatus('success')
       }
     } catch {
       setErrorMsg('Erro de conexão. Tente novamente.')
       setStatus('error')
+      setCaptchaKey(k => k + 1)
+      setTurnstileToken('')
     }
   }
 
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 transition-colors">
-      {/* Nav */}
       <Nav />
 
       <div className="max-w-md mx-auto px-6 pt-8 pb-16">
         <div className="text-center mb-8">
           <h1 className="text-2xl font-bold dark:text-white mb-2">Inscrever-se</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Receba alertas de desinformação e resumos semanais. Todos os campos são opcionais — preencha pelo menos um contato.
+            Receba alertas de desinformação e resumos semanais.
           </p>
         </div>
 
@@ -72,7 +89,7 @@ export default function SubscribePage() {
               {/* Nome */}
               <div>
                 <label className="block text-sm font-medium mb-1.5 dark:text-slate-200">
-                  Nome <span className="text-slate-400 text-xs">(opcional)</span>
+                  Como gostaria de ser chamado <span className="text-slate-400 text-xs">(opcional)</span>
                 </label>
                 <input
                   type="text"
@@ -83,21 +100,22 @@ export default function SubscribePage() {
                 />
               </div>
 
-              {/* Email */}
+              {/* Email (obrigatório) */}
               <div>
                 <label className="block text-sm font-medium mb-1.5 dark:text-slate-200">
-                  Email <span className="text-slate-400 text-xs">(opcional)</span>
+                  E-mail <span className="text-red-400 text-xs">*</span>
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seu@email.com"
+                  required
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 dark:text-white placeholder-slate-400"
                 />
               </div>
 
-              {/* WhatsApp */}
+              {/* WhatsApp (opcional) */}
               <div>
                 <label className="block text-sm font-medium mb-1.5 dark:text-slate-200">
                   WhatsApp <span className="text-slate-400 text-xs">(opcional)</span>
@@ -110,7 +128,32 @@ export default function SubscribePage() {
                   className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/50 dark:text-white placeholder-slate-400"
                 />
               </div>
+
+              {/* Checkbox LGPD */}
+              <div className="flex items-start gap-3 pt-2">
+                <input
+                  type="checkbox"
+                  id="accept-terms"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 dark:border-slate-600 text-brand-600 focus:ring-brand-500/50"
+                />
+                <label htmlFor="accept-terms" className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  Li e concordo com os{' '}
+                  <a href="/terms" target="_blank" className="text-brand-600 dark:text-brand-400 underline hover:no-underline">Termos de Uso</a>
+                  {' '}e a{' '}
+                  <a href="/privacy" target="_blank" className="text-brand-600 dark:text-brand-400 underline hover:no-underline">Política de Privacidade</a>.
+                </label>
+              </div>
             </div>
+
+            {/* Captcha */}
+            <CaptchaWrapper
+              onVerify={onCaptchaVerify}
+              onExpire={onCaptchaExpire}
+              resetKey={captchaKey}
+              className="my-2"
+            />
 
             {/* Error */}
             {status === 'error' && errorMsg && (
@@ -125,7 +168,7 @@ export default function SubscribePage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={status === 'loading'}
+              disabled={status === 'loading' || !acceptedTerms}
               className="w-full bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-700 hover:to-purple-700 text-white py-3.5 rounded-2xl font-semibold text-base shadow-lg shadow-brand-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
             >
               {status === 'loading' ? (

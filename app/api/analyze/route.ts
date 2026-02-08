@@ -1,67 +1,136 @@
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
-import { isGeminiConfigured } from '../../../lib/gemini'
-import { analyzePipeline } from '../../../lib/analyzePipeline'
-import { createServerSupabase } from '../../../lib/supabaseServer'
-import { checkRateLimit } from '../../../lib/rateLimit'
+import { isGeminiConfigured } from '@/lib/gemini'
+import { analyzePipeline } from '@/lib/analyzePipeline'
+import { createServerSupabase } from '@/lib/supabaseServer'
+import { checkRateLimitAsync } from '@/lib/rateLimitUpstash'
+import { verifyTurnstile } from '@/lib/auth/turnstile'
+import { analyzeSchema, sanitizeForLLM, isValidUrl } from '@/lib/validations'
+import { extractFromUrl } from '@/lib/services/extractor'
 
-export const runtime = "nodejs"
-
-// Max payload ~4.5 MB (base64 images/audio)
-const MAX_CONTENT_LENGTH = 4_500_000
-
-const BodySchema = z.object({
-  inputType: z.enum(['text', 'link', 'image', 'audio']),
-  content: z.string().max(MAX_CONTENT_LENGTH, 'Conteudo excede o limite de ~4.5 MB')
-})
+export const runtime = 'nodejs'
 
 export async function POST(req: Request) {
   try {
-    // Rate limiting by IP
+    // ── 1. Rate limit by IP ──
     const forwarded = req.headers.get('x-forwarded-for')
     const ip = forwarded?.split(',')[0]?.trim() || 'unknown'
-    const rl = checkRateLimit(ip)
+    const rl = await checkRateLimitAsync(ip)
+
     if (!rl.allowed) {
       return NextResponse.json({
         ok: false,
         error: 'RATE_LIMITED',
-        message: 'Muitas requisicoes. Aguarde um minuto.'
+        message: 'Muitas requisições. Aguarde um minuto.',
       }, { status: 429, headers: { 'Retry-After': '60' } })
     }
 
-    if (!isGeminiConfigured()) {
-      console.error("[api/analyze] GEMINI_API_KEY not configured")
+    // ── 2. Turnstile verification ──
+    const body = await req.json()
+    const turnstileResult = await verifyTurnstile(body.turnstileToken, ip)
+    if (!turnstileResult.success) {
       return NextResponse.json({
         ok: false,
-        error: "SERVER_MISCONFIG",
-        message: "GEMINI_API_KEY nao configurada no servidor (Vercel)."
+        error: 'CAPTCHA_FAILED',
+        message: 'Verificação anti-bot falhou. Recarregue a página e tente novamente.',
+      }, { status: 403 })
+    }
+
+    // ── 3. Validate input ──
+    const parsed = analyzeSchema.safeParse(body)
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0]?.message || 'Dados inválidos.'
+      return NextResponse.json({
+        ok: false,
+        error: 'VALIDATION',
+        message: firstError,
+      }, { status: 400 })
+    }
+
+    const { inputType, content } = parsed.data
+
+    // ── 4. Check Gemini config ──
+    if (!isGeminiConfigured()) {
+      console.error('[api/analyze] GEMINI_API_KEY not configured')
+      return NextResponse.json({
+        ok: false,
+        error: 'SERVER_MISCONFIG',
+        message: 'GEMINI_API_KEY não configurada no servidor (Vercel).',
       }, { status: 503 })
     }
 
-    const body = await req.json()
-    const parsed = BodySchema.parse(body)
+    // ── 5. Extract content from URL if inputType=link ──
+    let textForAnalysis = content
+    let sourceUrl: string | undefined
+    const extractionWarnings: string[] = []
 
-    const result = await analyzePipeline(parsed.inputType, parsed.content)
+    if (inputType === 'link') {
+      if (!isValidUrl(content.trim())) {
+        return NextResponse.json({
+          ok: false,
+          error: 'VALIDATION',
+          message: 'URL inválida. Verifique o formato e tente novamente.',
+        }, { status: 400 })
+      }
 
-    // Persist analysis to Supabase (best-effort, don't block response)
+      const extraction = await extractFromUrl(content.trim())
+
+      if (!extraction.ok || !extraction.text) {
+        return NextResponse.json({
+          ok: false,
+          error: 'EXTRACTION_FAILED',
+          message: extraction.error || 'Não foi possível extrair conteúdo do link.',
+        }, { status: 422 })
+      }
+
+      textForAnalysis = extraction.text
+      sourceUrl = extraction.sourceUrl
+      extractionWarnings.push(...extraction.warnings)
+    }
+
+    // ── 6. Sanitize text before LLM (text and link types) ──
+    if (inputType === 'text' || inputType === 'link') {
+      textForAnalysis = sanitizeForLLM(textForAnalysis, 10_000)
+    }
+
+    // ── 7. Run analysis pipeline ──
+    const result = await analyzePipeline(
+      inputType === 'link' ? 'text' : inputType,
+      textForAnalysis,
+    )
+
+    // Attach extraction metadata
+    if (sourceUrl) {
+      result.meta = result.meta || {}
+      result.meta.sourceUrl = sourceUrl
+    }
+    if (extractionWarnings.length > 0) {
+      result.meta = result.meta || {}
+      result.meta.warnings = [
+        ...(result.meta.warnings || []),
+        ...extractionWarnings,
+      ]
+    }
+
+    // ── 8. Persist to Supabase (best-effort) ──
     try {
       const supabase = createServerSupabase()
-      const inputSummary = parsed.content.slice(0, 500)
+      const inputSummary = (inputType === 'link' ? `[${content.trim()}] ` : '') + textForAnalysis.slice(0, 500)
+
       await supabase.from('analyses').insert({
-        input_type: parsed.inputType,
+        input_type: inputType,
         input_summary: inputSummary,
         scores: result.scores,
         verdict: result.summary?.verdict || 'Inconclusivo',
         report_markdown: result.reportMarkdown,
         claims: result.claims || [],
         fingerprint: result.meta?.fingerprint || null,
-        is_flagged: (result.scores?.fakeProbability || 0) >= 70
+        is_flagged: (result.scores?.fakeProbability || 0) >= 70,
       })
     } catch (dbErr) {
-      console.error("[api/analyze] Supabase insert failed (non-blocking):", dbErr)
+      console.error('[api/analyze] Supabase insert failed (non-blocking):', dbErr)
     }
 
-    // Update trending_items aggregation (best-effort)
+    // ── 9. Update trending aggregation (best-effort) ──
     try {
       const supabase = createServerSupabase()
       const fp = result.meta?.fingerprint
@@ -76,7 +145,7 @@ export async function POST(req: Request) {
           await supabase.from('trending_items').update({
             occurrences: (existing.occurrences || 1) + 1,
             last_seen: new Date().toISOString(),
-            score_fake_probability: result.scores?.fakeProbability || 0
+            score_fake_probability: result.scores?.fakeProbability || 0,
           }).eq('id', existing.id)
         } else {
           await supabase.from('trending_items').insert({
@@ -86,21 +155,21 @@ export async function POST(req: Request) {
             sample_claims: (result.claims || []).slice(0, 3),
             score_fake_probability: result.scores?.fakeProbability || 0,
             occurrences: 1,
-            last_seen: new Date().toISOString()
+            last_seen: new Date().toISOString(),
           })
         }
       }
     } catch (trendErr) {
-      console.error("[api/analyze] trending update failed (non-blocking):", trendErr)
+      console.error('[api/analyze] trending update failed (non-blocking):', trendErr)
     }
 
     return NextResponse.json(result)
   } catch (err: any) {
-    console.error("[api/analyze] error:", err)
+    console.error('[api/analyze] error:', err)
     return NextResponse.json({
       ok: false,
-      error: "ANALYZE_FAILED",
-      message: "Falha ao analisar no servidor. Tente novamente."
+      error: 'ANALYZE_FAILED',
+      message: 'Falha ao analisar no servidor. Tente novamente.',
     }, { status: 500 })
   }
 }

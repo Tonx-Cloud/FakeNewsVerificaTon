@@ -8,6 +8,8 @@ export default function Footer() {
             <a href="/sobre" className="hover:text-brand-500 transition">Sobre nós</a>
             <a href="/alerts" className="hover:text-brand-500 transition">Alertas</a>
             <a href="/subscribe" className="hover:text-brand-500 transition">Inscrever-se</a>
+            <a href="/privacy" className="hover:text-brand-500 transition">Privacidade</a>
+            <a href="/terms" className="hover:text-brand-500 transition">Termos</a>
           </div>
           <p className="mt-3 text-slate-300 dark:text-slate-600">
             Análise assistida por IA. Não substitui checagem profissional.

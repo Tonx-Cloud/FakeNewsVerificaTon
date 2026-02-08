@@ -6,6 +6,7 @@ import rehypeRaw from 'rehype-raw'
 import { useDarkMode } from '@/components/DarkModeProvider'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
+import CaptchaWrapper from '@/components/auth/captcha-wrapper'
 
 type TabType = 'text' | 'link' | 'image' | 'audio'
 type LoadingState = 'idle' | 'loading' | 'error' | 'success'
@@ -64,6 +65,11 @@ export default function Home() {
   const [showNeutrality, setShowNeutrality] = useState(false)
   const [pixCopied, setPixCopied] = useState(false)
   const [whatsCopied, setWhatsCopied] = useState(false)
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [captchaKey, setCaptchaKey] = useState(0)
+
+  const onCaptchaVerify = useCallback((token: string) => setTurnstileToken(token), [])
+  const onCaptchaExpire = useCallback(() => setTurnstileToken(''), [])
 
   const MAX_UPLOAD_SIZE = 4_500_000
 
@@ -84,11 +90,13 @@ export default function Home() {
     }
     setLoading('loading'); setApiError(null)
     try {
-      const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inputType: activeTab, content }) })
+      const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inputType: activeTab, content, turnstileToken: turnstileToken || undefined }) })
       const data = await res.json()
       if (!res.ok || !data.ok) { setApiError(data as ApiError); setLoading('error') }
       else { setReport(data as ReportResult); setLoading('success') }
-    } catch { setApiError({ ok: false, error: 'NETWORK_ERROR', message: 'Erro de conexão. Tente novamente.' }); setLoading('error') }
+      // Reset captcha on error
+      if (!res.ok || !data.ok) { setCaptchaKey(k => k + 1); setTurnstileToken('') }
+    } catch { setApiError({ ok: false, error: 'NETWORK_ERROR', message: 'Erro de conexão. Tente novamente.' }); setLoading('error'); setCaptchaKey(k => k + 1); setTurnstileToken('') }
   }
 
   const copyWhatsApp = () => {
@@ -213,6 +221,14 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        {/* Captcha */}
+        <CaptchaWrapper
+          onVerify={onCaptchaVerify}
+          onExpire={onCaptchaExpire}
+          resetKey={captchaKey}
+          className="mt-4"
+        />
 
         {/* CTA */}
         <button
