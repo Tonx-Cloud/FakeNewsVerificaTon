@@ -184,6 +184,11 @@ export default function Home() {
 
         {/* Input card */}
         <div className="glass rounded-2xl shadow-lg border border-slate-200/60 dark:border-slate-700/60 p-5">
+          {(activeTab === 'link' || activeTab === 'image' || activeTab === 'audio') && (
+            <div className="mb-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              ⚠️ Aviso: envio de link, imagem e audio esta em implantacao e pode nao funcionar corretamente.
+            </div>
+          )}
           {activeTab === 'text' && (
             <textarea
               value={content}
