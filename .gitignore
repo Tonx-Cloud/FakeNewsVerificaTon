@@ -8,3 +8,4 @@ coverage
 *.log
 .vercel
 .env*.local
+.env.backup
