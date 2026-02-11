@@ -88,12 +88,33 @@ export default function Home() {
       setLoading('error'); return
     }
     setLoading('loading'); setApiError(null)
-    try {
-      const res = await fetch('/api/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inputType: activeTab, content }) })
-      const data = await res.json()
-      if (!res.ok || !data.ok) { setApiError(data as ApiError); setLoading('error') }
-      else { setReport(data as ReportResult); setLoading('success') }
-    } catch { setApiError({ ok: false, error: 'NETWORK_ERROR', message: 'Erro de conexão. Tente novamente.' }); setLoading('error') }
+    const MAX_RETRIES = 3
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 180_000)
+        const res = await fetch('/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inputType: activeTab, content }),
+          signal: controller.signal,
+        })
+        clearTimeout(timeout)
+        const data = await res.json()
+        if (!res.ok || !data.ok) { setApiError(data as ApiError); setLoading('error') }
+        else { setReport(data as ReportResult); setLoading('success') }
+        return // success — exit loop
+      } catch (err) {
+        if (attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, attempt * 1500)) // 1.5s, 3s backoff
+          continue
+        }
+        const msg = err instanceof DOMException && err.name === 'AbortError'
+          ? 'A análise demorou demais. Tente com um texto menor.'
+          : 'Erro de conexão. Tente novamente.'
+        setApiError({ ok: false, error: 'NETWORK_ERROR', message: msg }); setLoading('error')
+      }
+    }
   }
 
   const copyWhatsApp = () => {
