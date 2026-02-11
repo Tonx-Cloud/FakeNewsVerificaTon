@@ -184,9 +184,14 @@ export default function Home() {
 
         {/* Input card */}
         <div className="glass rounded-2xl shadow-lg border border-slate-200/60 dark:border-slate-700/60 p-5">
-          {(activeTab === 'link' || activeTab === 'image' || activeTab === 'audio') && (
+          {(activeTab === 'link' || activeTab === 'image') && (
             <div className="mb-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-              ⚠️ Aviso: envio de link, imagem e audio esta em implantacao e pode nao funcionar corretamente.
+              ⚠️ Aviso: envio de link e imagem esta em implantacao e pode nao funcionar corretamente.
+            </div>
+          )}
+          {activeTab === 'audio' && (
+            <div className="mb-4 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+              🎙️ O áudio será transcrito automaticamente via Whisper AI e analisado pelo Gemini. Formatos aceitos: MP3, WAV, M4A, OGG, WebM, FLAC.
             </div>
           )}
           {activeTab === 'text' && (
@@ -266,7 +271,7 @@ export default function Home() {
           {loading === 'loading' ? (
             <>
               <svg className="spinner w-5 h-5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-              Analisando...
+              {activeTab === 'audio' ? 'Transcrevendo e analisando...' : 'Analisando...'}
             </>
           ) : 'Analisar'}
         </button>

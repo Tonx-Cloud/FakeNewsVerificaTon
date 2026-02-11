@@ -162,7 +162,7 @@ export async function analyzePipeline(inputType: string, content: string) {
   // Build parts array for Gemini (supports multimodal)
   const parts: any[] = []
 
-  if (inputType === 'image' || inputType === 'audio') {
+  if (inputType === 'image') {
     const dataUrl = parseDataUrl(content)
     if (dataUrl) {
       parts.push({
@@ -171,14 +171,29 @@ export async function analyzePipeline(inputType: string, content: string) {
           data: dataUrl.base64Data
         }
       })
-      const mediaLabel = inputType === 'image'
-        ? 'The user uploaded an image. Describe what you see and analyze any text, claims or manipulation signs in it.'
-        : 'The user uploaded an audio file. Transcribe what you hear and analyze any claims, bias or manipulation signs.'
-      parts.push({ text: `${SYSTEM_PROMPT}\n\n${mediaLabel}` })
+      parts.push({ text: `${SYSTEM_PROMPT}\n\nThe user uploaded an image. Describe what you see and analyze any text, claims or manipulation signs in it.` })
     } else {
       const normalized = content.slice(0, 20000)
       parts.push({ text: `${SYSTEM_PROMPT}\n\nContent to analyze:\n${normalized}` })
     }
+  } else if (inputType === 'audio') {
+    // Fallback: Gemini native audio (base64 data-url)
+    const dataUrl = parseDataUrl(content)
+    if (dataUrl) {
+      parts.push({
+        inlineData: {
+          mimeType: dataUrl.mimeType,
+          data: dataUrl.base64Data
+        }
+      })
+      parts.push({ text: `${SYSTEM_PROMPT}\n\nThe user uploaded an audio file. Transcribe what you hear and analyze any claims, bias or manipulation signs.` })
+    } else {
+      const normalized = content.slice(0, 20000)
+      parts.push({ text: `${SYSTEM_PROMPT}\n\nContent to analyze:\n${normalized}` })
+    }
+  } else if (inputType === 'audio_transcript') {
+    const normalized = content.slice(0, 20000)
+    parts.push({ text: `${SYSTEM_PROMPT}\n\nThe following is an AUTOMATICALLY EXTRACTED transcript from an audio file (via Whisper speech-to-text). Analyze the spoken claims, statements and information for signs of disinformation, bias or manipulation. Do NOT say you cannot access the audio — the transcript text below IS the audio content.\n\nAudio transcript:\n${normalized}` })
   } else if (inputType === 'youtube_transcript') {
     const normalized = content.slice(0, 20000)
     parts.push({ text: `${SYSTEM_PROMPT}\n\nThe following is an AUTOMATICALLY EXTRACTED transcript from a YouTube video. Analyze the spoken claims, statements and information for signs of disinformation, bias or manipulation. Do NOT say you cannot access the video — the transcript text below IS the video content.\n\nYouTube transcript:\n${normalized}` })

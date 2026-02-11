@@ -6,6 +6,7 @@ import { checkRateLimitAsync } from '@/lib/rateLimitUpstash'
 import { verifyTurnstile } from '@/lib/auth/turnstile'
 import { analyzeSchema, sanitizeForLLM, isValidUrl } from '@/lib/validations'
 import { extractFromUrl, isYouTubeUrl } from '@/lib/services/extractor'
+import { extractAudioTranscript } from '@/lib/services/extractor.audio'
 
 export const runtime = 'nodejs'
 
@@ -109,8 +110,28 @@ export async function POST(req: Request) {
       }
     }
 
-    // ── 6. Sanitize text before LLM (text, link and youtube types) ──
-    if (effectiveInputType === 'text' || effectiveInputType === 'youtube_transcript' || inputType === 'link') {
+    // ── 5b. Extract transcript from audio if inputType=audio ──
+    if (inputType === 'audio') {
+      console.log(`[api/analyze] Audio transcription via Whisper-SRT...`)
+      const audioResult = await extractAudioTranscript(content)
+
+      if (!audioResult.ok || !audioResult.text) {
+        console.warn(`[api/analyze] Audio extraction failed: ${audioResult.error}`)
+        return NextResponse.json({
+          ok: false,
+          error: 'EXTRACTION_FAILED',
+          message: audioResult.error || 'Não foi possível transcrever o áudio.',
+        }, { status: 422 })
+      }
+
+      textForAnalysis = audioResult.text
+      effectiveInputType = 'audio_transcript'
+      extractionWarnings.push(...audioResult.warnings)
+      console.log(`[api/analyze] Audio transcript obtained: ${textForAnalysis.length} chars`)
+    }
+
+    // ── 6. Sanitize text before LLM (text, link, youtube and audio transcript types) ──
+    if (effectiveInputType === 'text' || effectiveInputType === 'youtube_transcript' || effectiveInputType === 'audio_transcript' || inputType === 'link') {
       textForAnalysis = sanitizeForLLM(textForAnalysis, 10_000)
     }
 
