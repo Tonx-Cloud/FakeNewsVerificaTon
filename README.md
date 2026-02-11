@@ -14,7 +14,6 @@ Ferramenta de análise de desinformação assistida por IA. Recebe conteúdo (te
 - **Whisper-SRT Portal** — transcrição de áudio via Whisper AI (JWT auth, upload → poll → SRT → texto)
 - **Supabase** — Auth (magic link), PostgreSQL (profiles, analyses, trending_items, subscribers)
 - **Resend** — e-mails transacionais (confirmação, cancelamento, digest)
-- **Cloudflare Turnstile** — anti-bot (CAPTCHA invisível)
 - **Upstash Redis** — rate limiting
 - **react-markdown** + remark-gfm + rehype-raw — renderização de relatórios em Markdown
 - **Vercel** — deploy automático + cron (`maxDuration: 180s` para análise de áudio)
@@ -50,14 +49,11 @@ Veja `.env.example` para a lista completa.
 | `NEXT_PUBLIC_APP_URL` | URL pública (`https://fakenewsverificaton.com.br`) |
 | `CRON_SECRET` | Segredo para proteger endpoint de cron |
 | `UNSUB_SECRET` | Segredo para tokens assinados (confirm/cancel) |
-| `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Chave pública Cloudflare Turnstile |
-| `TURNSTILE_SECRET_KEY` | Chave secreta Cloudflare Turnstile |
 | `UPSTASH_REDIS_REST_URL` | URL do Redis Upstash |
 | `UPSTASH_REDIS_REST_TOKEN` | Token do Redis Upstash |
 | `WHISPER_EMAIL` | Email de login no Whisper-SRT Portal (auth JWT) |
 | `WHISPER_PASSWORD` | Senha de login no Whisper-SRT Portal |
 | `WHISPER_SRT_API_KEY` | *(opcional)* API Key do Whisper-SRT (fallback se JWT falhar) |
-| `ANALYZE_API_KEY` | *(opcional)* Chave para bypass do Turnstile em chamadas server-to-server |
 
 ## Banco de dados (Supabase)
 
@@ -87,7 +83,7 @@ Todas com RLS ativado. Service role gerencia via API routes.
 
 | Endpoint | Método | Descrição |
 |----------|--------|-----------|
-| `/api/check` | POST | Análise de conteúdo: texto, link, imagem ou áudio (rate limit, max 4.5 MB) |
+| `/api/check` | POST | Análise de conteúdo: texto, link, imagem ou áudio (rate limit, max 4.5 MB). Acessível via rewrite `/verify` no frontend |
 | `/api/subscribe` | POST | Inscrição — envia e-mail de confirmação (double opt-in) |
 | `/api/subscribe/confirm` | GET | Confirma inscrição via token assinado |
 | `/api/subscribe/cancel` | POST | Solicita cancelamento — envia e-mail de confirmação |
@@ -98,10 +94,9 @@ Todas com RLS ativado. Service role gerencia via API routes.
 
 1. Usuário preenche formulário em `/subscribe` (email obrigatório, nome e WhatsApp opcionais)
 2. Aceita Termos e Política de Privacidade (checkbox obrigatório)
-3. CAPTCHA Cloudflare Turnstile verificado
-4. API gera token assinado (HMAC, 48h de validade) com dados do inscrito
-5. E-mail de confirmação enviado via Resend
-6. Usuário clica no link → dados inseridos no banco → inscrição ativa
+3. API gera token assinado (HMAC, 48h de validade) com dados do inscrito
+4. E-mail de confirmação enviado via Resend
+5. Usuário clica no link → dados inseridos no banco → inscrição ativa
 
 ## Fluxo de cancelamento (LGPD opt-out)
 
@@ -141,10 +136,9 @@ API: [Whisper-SRT Portal](https://github.com/Tonx-Cloud/whisper-srt-portal)
 
 ## Segurança
 
-- **CAPTCHA:** Cloudflare Turnstile em análise e inscrição (auto-retry 3x, timeout 10s)
-- **CSP:** Content Security Policy configurada para permitir apenas Cloudflare challenges, Supabase e Gemini
-- **CORS:** Origins restritos (domínios de produção + Vercel previews)
-- **API Key bypass:** Chamadas server-to-server podem enviar `X-API-Key` para pular Turnstile
+- **CORS:** Wildcard `Access-Control-Allow-Origin: *` em todas as respostas da API (safe — API é same-origin)
+- **Rewrite:** Frontend chama `/verify` que é reescrito para `/api/check` (evita interferência de extensões/filtros)
+- **Retry:** 3 tentativas com backoff (1.5s, 3s) + AbortController (180s timeout) para resiliência
 - **Rate Limiting:** Upstash Redis (10 req/min por IP na análise, 5 req/min na inscrição)
 - **Tokens assinados:** HMAC-SHA256 com expiração para confirmação/cancelamento
 - **Zod:** Validação de todos os inputs
@@ -153,26 +147,19 @@ API: [Whisper-SRT Portal](https://github.com/Tonx-Cloud/whisper-srt-portal)
 
 ## Troubleshooting
 
-### Erro 403 / CAPTCHA_FAILED
+### Erro de conexão / NETWORK_ERROR
 
-O Cloudflare Turnstile renderiza um iframe com desafios anti-bot. Se o widget não carregar, nenhum token é gerado e a API retorna 403.
-
-**Causas comuns:**
+O frontend possui retry automático (3 tentativas com backoff). Se o erro persistir:
 
 | Causa | Solução |
 |-------|--------|
-| Extensão do navegador (ad-blocker, privacy badger, etc.) | Testar em **aba anônima** (sem extensões) |
-| Iframe sandboxed (`about:blank` sem `allow-scripts`) | Garantir que o site não está dentro de iframe com sandbox restritivo |
-| CSP bloqueando `challenges.cloudflare.com` | Verificar headers CSP no `next.config.js` |
-| `TURNSTILE_SECRET_KEY` não configurada | Verificar env vars no Vercel |
-| Token expirado (clicou muito devagar)  | O widget tem auto-refresh; recarregue a página |
+| Extensão do navegador interferindo em requisições | Testar em **aba anônima** (sem extensões) |
+| Timeout da função serverless (>180s) | Tentar com conteúdo menor |
+| Instabilidade de rede | Aguardar e tentar novamente |
 
-**Diagnóstico (console):**
-- `Blocked script execution in 'about:blank'` → extensão ou sandbox
-- `content.js` / `debug.js` errors → extensão do navegador
-- `script-src was not explicitly set` → CSP configurada (normal, usa `default-src` como fallback)
+### Erro 429 / RATE_LIMITED
 
-**Para chamadas server-to-server:** envie header `X-API-Key` com o valor de `ANALYZE_API_KEY` para pular a verificação do Turnstile.
+Aguarde 1 minuto. O limite é 10 análises/minuto por IP.
 
 ## Cron
 
