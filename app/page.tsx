@@ -6,7 +6,7 @@ import rehypeRaw from 'rehype-raw'
 import { useDarkMode } from '@/components/DarkModeProvider'
 import Nav from '@/components/Nav'
 import Footer from '@/components/Footer'
-import CaptchaWrapper from '@/components/auth/captcha-wrapper'
+import CaptchaWrapper, { type CaptchaStatus } from '@/components/auth/captcha-wrapper'
 
 type TabType = 'text' | 'link' | 'image' | 'audio'
 type LoadingState = 'idle' | 'loading' | 'error' | 'success'
@@ -68,9 +68,12 @@ export default function Home() {
   const [turnstileToken, setTurnstileToken] = useState('')
   const [captchaKey, setCaptchaKey] = useState(0)
   const [homeConsentChecked, setHomeConsentChecked] = useState(false)
+  const [captchaStatus, setCaptchaStatus] = useState<CaptchaStatus>('loading')
 
   const onCaptchaVerify = useCallback((token: string) => setTurnstileToken(token), [])
-  const onCaptchaExpire = useCallback(() => setTurnstileToken(''), [])
+  const onCaptchaExpire = useCallback(() => { setTurnstileToken(''); setCaptchaStatus('ready') }, [])
+  const onCaptchaError = useCallback(() => { setTurnstileToken('') }, [])
+  const onCaptchaStatusChange = useCallback((s: CaptchaStatus) => setCaptchaStatus(s), [])
 
   const MAX_UPLOAD_SIZE = 4_500_000
 
@@ -241,6 +244,8 @@ export default function Home() {
         <CaptchaWrapper
           onVerify={onCaptchaVerify}
           onExpire={onCaptchaExpire}
+          onError={onCaptchaError}
+          onStatusChange={onCaptchaStatusChange}
           resetKey={captchaKey}
           className="mt-4"
         />
@@ -288,6 +293,7 @@ export default function Home() {
                    apiError.error === 'RATE_LIMITED' ? 'Muitas requisições. Aguarde um minuto.' :
                    apiError.error === 'TOO_LARGE' ? apiError.message :
                    apiError.error === 'CONSENT_MISSING' ? 'Para continuar, aceite os Termos e a Política de Privacidade.' :
+                   apiError.error === 'CAPTCHA_FAILED' ? 'Verificação anti-bot falhou. Recarregue a página ou tente em aba anônima (extensões podem interferir).' :
                    'Servidor não conseguiu analisar. Tente novamente.'}
                 </p>
               </div>

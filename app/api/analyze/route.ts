@@ -41,10 +41,13 @@ export async function POST(req: Request) {
     const body = await req.json()
     const turnstileResult = await verifyTurnstile(body.turnstileToken, ip)
     if (!turnstileResult.success) {
+      const isMissing = turnstileResult.errorCodes.includes('missing-input-response')
       return NextResponse.json({
         ok: false,
         error: 'CAPTCHA_FAILED',
-        message: 'Verificação anti-bot falhou. Recarregue a página e tente novamente.',
+        message: isMissing
+          ? 'Verificação anti-bot não foi carregada. Recarregue a página ou tente em aba anônima.'
+          : 'Verificação anti-bot falhou. Recarregue a página e tente novamente.',
       }, { status: 403 })
     }
 
