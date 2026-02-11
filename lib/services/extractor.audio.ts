@@ -4,12 +4,19 @@ import 'server-only'
  * Audio extractor using Whisper-SRT Portal API.
  * Uploads audio → polls until done → downloads .srt → converts to text.
  *
+ * Auth strategy:
+ *   1. JWT login (WHISPER_EMAIL + WHISPER_PASSWORD) — works on all endpoints
+ *   2. API Key (WHISPER_SRT_API_KEY) — fallback, requires patched whisper-srt
+ *
  * API: https://frontend-beryl-gamma-80.vercel.app
  */
 
 const WHISPER_API_BASE = 'https://frontend-beryl-gamma-80.vercel.app'
 const MAX_POLL_ATTEMPTS = 60       // 60 × 3s = 180s máximo de espera
 const POLL_INTERVAL_MS  = 3_000    // 3 segundos entre checks
+
+// Cache JWT token in memory (valid for 8h by default)
+let cachedJwt: { token: string; expiresAt: number } | null = null
 
 export interface AudioExtractionResult {
   ok: boolean
@@ -97,16 +104,68 @@ function segmentsToText(segments: SrtSegment[]): string {
 }
 
 /**
+ * Obtém headers de autenticação para a API Whisper-SRT.
+ * Prioridade: JWT login > API Key
+ */
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const email = process.env.WHISPER_EMAIL
+  const password = process.env.WHISPER_PASSWORD
+  const apiKey = process.env.WHISPER_SRT_API_KEY
+
+  // 1. Tentar JWT login
+  if (email && password) {
+    // Usar cache se ainda válido (com margem de 5 min)
+    if (cachedJwt && Date.now() < cachedJwt.expiresAt - 300_000) {
+      return { 'Authorization': `Bearer ${cachedJwt.token}` }
+    }
+
+    try {
+      console.log('[extractor.audio] Logging in via JWT...')
+      const loginRes = await fetch(`${WHISPER_API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (loginRes.ok) {
+        const data = await loginRes.json() as { access_token: string }
+        // Cache for 7 hours (default expiry is 8h)
+        cachedJwt = {
+          token: data.access_token,
+          expiresAt: Date.now() + 7 * 60 * 60 * 1000,
+        }
+        console.log('[extractor.audio] JWT obtained successfully')
+        return { 'Authorization': `Bearer ${data.access_token}` }
+      } else {
+        console.warn(`[extractor.audio] JWT login failed (${loginRes.status}), trying API key...`)
+      }
+    } catch (err) {
+      console.warn('[extractor.audio] JWT login error, trying API key...', err)
+    }
+  }
+
+  // 2. Fallback: API Key
+  if (apiKey) {
+    return { 'X-API-Key': apiKey }
+  }
+
+  throw new Error('Nenhuma credencial configurada para o Whisper-SRT (WHISPER_EMAIL+WHISPER_PASSWORD ou WHISPER_SRT_API_KEY).')
+}
+
+/**
  * Extrai transcrição de um áudio via Whisper-SRT Portal.
  * Recebe o conteúdo como data-URL (base64).
  */
 export async function extractAudioTranscript(audioDataUrl: string): Promise<AudioExtractionResult> {
-  const apiKey = process.env.WHISPER_SRT_API_KEY
-  if (!apiKey) {
-    console.error('[extractor.audio] WHISPER_SRT_API_KEY not configured')
+  // Verificar se há alguma credencial configurada
+  const hasJwt = process.env.WHISPER_EMAIL && process.env.WHISPER_PASSWORD
+  const hasApiKey = process.env.WHISPER_SRT_API_KEY
+
+  if (!hasJwt && !hasApiKey) {
+    console.error('[extractor.audio] No Whisper-SRT credentials configured')
     return {
       ok: false,
-      error: 'Serviço de transcrição de áudio não configurado (WHISPER_SRT_API_KEY).',
+      error: 'Serviço de transcrição de áudio não configurado. Configure WHISPER_EMAIL+WHISPER_PASSWORD ou WHISPER_SRT_API_KEY.',
       warnings: [],
     }
   }
@@ -125,6 +184,14 @@ export async function extractAudioTranscript(audioDataUrl: string): Promise<Audi
   console.log(`[extractor.audio] Audio: ${mimeType}, ${(buffer.length / 1024).toFixed(0)} KB`)
 
   try {
+    // Obter headers de autenticação (JWT ou API key)
+    let authHeaders: Record<string, string>
+    try {
+      authHeaders = await getAuthHeaders()
+    } catch (authErr: any) {
+      return { ok: false, error: authErr.message, warnings: [] }
+    }
+
     // 2. Upload para Whisper-SRT API via FormData
     const formData = new FormData()
     const uint8 = new Uint8Array(buffer)
@@ -136,7 +203,7 @@ export async function extractAudioTranscript(audioDataUrl: string): Promise<Audi
     console.log(`[extractor.audio] Uploading to Whisper-SRT...`)
     const uploadRes = await fetch(`${WHISPER_API_BASE}/api/jobs`, {
       method: 'POST',
-      headers: { 'X-API-Key': apiKey },
+      headers: { ...authHeaders },
       body: formData,
     })
 
@@ -162,7 +229,7 @@ export async function extractAudioTranscript(audioDataUrl: string): Promise<Audi
       attempts++
 
       const pollRes = await fetch(`${WHISPER_API_BASE}/api/jobs/${job.id}`, {
-        headers: { 'X-API-Key': apiKey },
+        headers: { ...authHeaders },
       })
 
       if (!pollRes.ok) {
@@ -186,7 +253,7 @@ export async function extractAudioTranscript(audioDataUrl: string): Promise<Audi
     // 4. Download do .srt
     console.log(`[extractor.audio] Downloading SRT...`)
     const downloadRes = await fetch(`${WHISPER_API_BASE}/api/jobs/${job.id}/download`, {
-      headers: { 'X-API-Key': apiKey },
+      headers: { ...authHeaders },
     })
 
     if (!downloadRes.ok) {
