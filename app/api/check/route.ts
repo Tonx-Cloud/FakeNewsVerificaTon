@@ -9,36 +9,22 @@ import { extractAudioTranscript } from '@/lib/services/extractor.audio'
 
 export const runtime = 'nodejs'
 
-/** Allowed origins for CORS */
-const ALLOWED_ORIGINS = [
-  'https://fakenewsverificaton.com.br',
-  'https://www.fakenewsverificaton.com.br',
-  'https://fakenewsverificaton.vercel.app',
-]
-
-function getCorsOrigin(req: Request): string {
-  const origin = req.headers.get('origin') || ''
-  if (ALLOWED_ORIGINS.includes(origin)) return origin
-  // Allow any vercel preview deploy
-  if (origin.endsWith('.vercel.app')) return origin
-  return ALLOWED_ORIGINS[0]
-}
-
-const CORS_HEADERS = {
+/** CORS headers — same-origin in practice, wildcard is safe */
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-API-Key, X-Requested-With, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type',
   'Access-Control-Max-Age': '86400',
 }
 
 /* Preflight CORS */
-export async function OPTIONS(req: Request) {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'Access-Control-Allow-Origin': getCorsOrigin(req),
-      ...CORS_HEADERS,
-    },
-  })
+export function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS })
+}
+
+/** Helper to return JSON with CORS headers */
+function json(data: unknown, status = 200, extra: Record<string, string> = {}) {
+  return NextResponse.json(data, { status, headers: { ...CORS, ...extra } })
 }
 
 export async function POST(req: Request) {
@@ -49,11 +35,7 @@ export async function POST(req: Request) {
     const rl = await checkRateLimitAsync(ip)
 
     if (!rl.allowed) {
-      return NextResponse.json({
-        ok: false,
-        error: 'RATE_LIMITED',
-        message: 'Muitas requisições. Aguarde um minuto.',
-      }, { status: 429, headers: { 'Retry-After': '60' } })
+      return json({ ok: false, error: 'RATE_LIMITED', message: 'Muitas requisições. Aguarde um minuto.' }, 429, { 'Retry-After': '60' })
     }
 
     // ── 2. Parse body ──
@@ -63,23 +45,15 @@ export async function POST(req: Request) {
     const parsed = analyzeSchema.safeParse(body)
     if (!parsed.success) {
       const firstError = parsed.error.errors[0]?.message || 'Dados inválidos.'
-      return NextResponse.json({
-        ok: false,
-        error: 'VALIDATION',
-        message: firstError,
-      }, { status: 400 })
+      return json({ ok: false, error: 'VALIDATION', message: firstError }, 400)
     }
 
     const { inputType, content } = parsed.data
 
     // ── 4. Check Gemini config ──
     if (!isGeminiConfigured()) {
-      console.error('[api/analyze] GEMINI_API_KEY not configured')
-      return NextResponse.json({
-        ok: false,
-        error: 'SERVER_MISCONFIG',
-        message: 'GEMINI_API_KEY não configurada no servidor (Vercel).',
-      }, { status: 503 })
+      console.error('[api/check] GEMINI_API_KEY not configured')
+      return json({ ok: false, error: 'SERVER_MISCONFIG', message: 'GEMINI_API_KEY não configurada no servidor (Vercel).' }, 503)
     }
 
     // ── 5. Extract content from URL if inputType=link ──
@@ -90,25 +64,17 @@ export async function POST(req: Request) {
 
     if (inputType === 'link') {
       if (!isValidUrl(content.trim())) {
-        return NextResponse.json({
-          ok: false,
-          error: 'VALIDATION',
-          message: 'URL inválida. Verifique o formato e tente novamente.',
-        }, { status: 400 })
+        return json({ ok: false, error: 'VALIDATION', message: 'URL inválida. Verifique o formato e tente novamente.' }, 400)
       }
 
       const isYT = isYouTubeUrl(content.trim())
-      console.log(`[api/analyze] URL extraction — isYouTube: ${isYT}, url: ${content.trim().slice(0, 100)}`)
+      console.log(`[api/check] URL extraction — isYouTube: ${isYT}, url: ${content.trim().slice(0, 100)}`)
 
       const extraction = await extractFromUrl(content.trim())
 
       if (!extraction.ok || !extraction.text) {
-        console.warn(`[api/analyze] Extraction failed: ${extraction.error}`)
-        return NextResponse.json({
-          ok: false,
-          error: 'EXTRACTION_FAILED',
-          message: extraction.error || 'Não foi possível extrair conteúdo do link.',
-        }, { status: 422 })
+        console.warn(`[api/check] Extraction failed: ${extraction.error}`)
+        return json({ ok: false, error: 'EXTRACTION_FAILED', message: extraction.error || 'Não foi possível extrair conteúdo do link.' }, 422)
       }
 
       textForAnalysis = extraction.text
@@ -117,28 +83,24 @@ export async function POST(req: Request) {
 
       if (isYT) {
         effectiveInputType = 'youtube_transcript'
-        console.log(`[api/analyze] YouTube transcript obtained: ${textForAnalysis.length} chars`)
+        console.log(`[api/check] YouTube transcript obtained: ${textForAnalysis.length} chars`)
       }
     }
 
     // ── 5b. Extract transcript from audio if inputType=audio ──
     if (inputType === 'audio') {
-      console.log(`[api/analyze] Audio transcription via Whisper-SRT...`)
+      console.log(`[api/check] Audio transcription via Whisper-SRT...`)
       const audioResult = await extractAudioTranscript(content)
 
       if (!audioResult.ok || !audioResult.text) {
-        console.warn(`[api/analyze] Audio extraction failed: ${audioResult.error}`)
-        return NextResponse.json({
-          ok: false,
-          error: 'EXTRACTION_FAILED',
-          message: audioResult.error || 'Não foi possível transcrever o áudio.',
-        }, { status: 422 })
+        console.warn(`[api/check] Audio extraction failed: ${audioResult.error}`)
+        return json({ ok: false, error: 'EXTRACTION_FAILED', message: audioResult.error || 'Não foi possível transcrever o áudio.' }, 422)
       }
 
       textForAnalysis = audioResult.text
       effectiveInputType = 'audio_transcript'
       extractionWarnings.push(...audioResult.warnings)
-      console.log(`[api/analyze] Audio transcript obtained: ${textForAnalysis.length} chars`)
+      console.log(`[api/check] Audio transcript obtained: ${textForAnalysis.length} chars`)
     }
 
     // ── 6. Sanitize text before LLM (text, link, youtube and audio transcript types) ──
@@ -178,7 +140,7 @@ export async function POST(req: Request) {
         is_flagged: (result.scores?.fakeProbability || 0) >= 70,
       })
     } catch (dbErr) {
-      console.error('[api/analyze] Supabase insert failed (non-blocking):', dbErr)
+      console.error('[api/check] Supabase insert failed (non-blocking):', dbErr)
     }
 
     // ── 9. Update trending aggregation (best-effort) ──
@@ -211,16 +173,12 @@ export async function POST(req: Request) {
         }
       }
     } catch (trendErr) {
-      console.error('[api/analyze] trending update failed (non-blocking):', trendErr)
+      console.error('[api/check] trending update failed (non-blocking):', trendErr)
     }
 
-    return NextResponse.json(result)
+    return json(result)
   } catch (err: any) {
-    console.error('[api/analyze] error:', err)
-    return NextResponse.json({
-      ok: false,
-      error: 'ANALYZE_FAILED',
-      message: 'Falha ao analisar no servidor. Tente novamente.',
-    }, { status: 500 })
+    console.error('[api/check] error:', err)
+    return json({ ok: false, error: 'ANALYZE_FAILED', message: 'Falha ao analisar no servidor. Tente novamente.' }, 500)
   }
 }

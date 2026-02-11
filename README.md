@@ -87,7 +87,7 @@ Todas com RLS ativado. Service role gerencia via API routes.
 
 | Endpoint | Método | Descrição |
 |----------|--------|-----------|
-| `/api/analyze` | POST | Análise de conteúdo: texto, link, imagem ou áudio (rate limit, Turnstile, max 4.5 MB) |
+| `/api/check` | POST | Análise de conteúdo: texto, link, imagem ou áudio (rate limit, max 4.5 MB) |
 | `/api/subscribe` | POST | Inscrição — envia e-mail de confirmação (double opt-in) |
 | `/api/subscribe/confirm` | GET | Confirma inscrição via token assinado |
 | `/api/subscribe/cancel` | POST | Solicita cancelamento — envia e-mail de confirmação |

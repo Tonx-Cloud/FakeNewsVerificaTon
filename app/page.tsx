@@ -89,7 +89,7 @@ export default function Home() {
     }
     setLoading('loading'); setApiError(null)
     try {
-      const res = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inputType: activeTab, content }) })
+      const res = await fetch('/api/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ inputType: activeTab, content }) })
       const data = await res.json()
       if (!res.ok || !data.ok) { setApiError(data as ApiError); setLoading('error') }
       else { setReport(data as ReportResult); setLoading('success') }
